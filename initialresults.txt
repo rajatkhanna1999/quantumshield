@@ -1,0 +1,87 @@
+(venv) PS C:\Users\rajat\workplace\quantamshield> python test_vulnerabilities.py
+
+QuantumShield Vulnerability Reproduction — Windows 16GB
+Date: 2026-05-07
+------------------------------------------------------------
+
+======================================================================
+  TEST 1 — CWE-77: QASM Injection
+======================================================================
+  Question: Does the SDK pass user input to its QASM parser without sanitization?
+  A vulnerable SDK accepts this without raising a security warning.
+
+  PARTIAL      | Qiskit               | CWE-77          | Parser rejected but entry point UNSANITIZED. Error: QASM2ParseError
+  PARTIAL      | Qiskit               | CWE-77 (file)   | File entry point also unsanitized. Error: QASM2ParseError
+  PARTIAL      | Cirq                 | CWE-77          | QASM contrib not available — primary surface is CWE-502
+  PARTIAL      | PennyLane            | CWE-77          | Primary surface is CWE-400. See Test 2.
+  PARTIAL      | qibo                 | CWE-77          | Primary surface is CWE-400. See Test 2.
+
+======================================================================
+  TEST 2 — CWE-400: Resource Exhaustion (np.zeros(2**n) unvalidated)
+======================================================================
+  Question: Does the SDK check qubit count BEFORE allocating 2^n memory?
+  Windows 16GB: Testing with n=29 (4GB needed). Safe and proves no validation.
+
+  VULNERABLE  | Qiskit Aer           | CWE-400         | QuantumCircuit(29) created with no memory pre-check. Simulation would need 8GB.
+  VULNERABLE  | PennyLane            | CWE-400         | Created device with 27 wires, no pre-check of 2^27 state
+  PARTIAL      | Cirq                 | CWE-400         | Created 27 LineQubits without count validation. Simulation allocates 2^n without pre-check.
+  VULNERABLE  | qibo                 | CWE-400         | Circuit(27) created with no qubit count validation
+
+======================================================================
+  TEST 3 — CWE-502: Unsafe Deserialization (pickle/dill usage)
+======================================================================
+  Method: Scanning installed SDK source for pickle.load() and dill.load()
+  Finding these patterns = vulnerability confirmed.
+
+  Scanning Qiskit... (may take 30–60 seconds)
+  VULNERABLE  | Qiskit               | CWE-502         | Found 1 file(s) with dangerous deserialization
+      → dill.loads( in ...qiskit\passmanager\passmanager.py
+  Scanning Cirq... (may take 30–60 seconds)
+  VULNERABLE  | Cirq                 | CWE-502         | Found 3 file(s) with dangerous deserialization
+      → pickle.loads( in ...cirq\circuits\insert_strategy_test.py
+      → pickle.loads( in ...cirq\devices\grid_qubit_test.py
+  Scanning PennyLane... (may take 30–60 seconds)
+  VULNERABLE  | PennyLane            | CWE-502         | Found 1 file(s) with dangerous deserialization
+      → pickle.loads( in ...pennylane\ops\functions\assert_valid.py
+  Scanning qibo... (may take 30–60 seconds)
+  SAFE         | qibo                 | CWE-502         | No pickle/dill/joblib.load found in source
+
+======================================================================
+  TEST 4 — CWE-94: Code Injection via eval()
+======================================================================
+  Method: Scanning installed SDK source for eval() calls
+  Note: not all eval() calls are vulnerable — manual review needed.
+
+  Scanning Qiskit...
+  PARTIAL      | Qiskit               | CWE-94          | 1 eval() call(s) found — manual review needed
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\qiskit\circuit\annotation.py:144:             return Perfo
+  Scanning Cirq...
+  PARTIAL      | Cirq                 | CWE-94          | 29 eval() call(s) found — manual review needed
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\cirq\_compat_test.py:69:     v2 = eval(proper_repr(v))
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\cirq\_compat_test.py:73:     v2 = eval(proper_repr(v))
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\cirq\_compat_test.py:82:     df2 = eval(proper_repr(df))
+  Scanning PennyLane...
+  PARTIAL      | PennyLane            | CWE-94          | 88 eval() call(s) found — manual review needed
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\pennylane\allocation.py:59:     def _allocate_primitive_ab
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\pennylane\allocation.py:73:     def _deallocate_primitive_
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\pennylane\operation.py:362:     def _abstract_eval(*_, **_
+  Scanning qibo...
+  PARTIAL      | qibo                 | CWE-94          | 1 eval() call(s) found — manual review needed
+      → C:\Users\rajat\workplace\quantamshield\venv\Lib\site-packages\qibo\models\_openqasm.py:237:                 arg = eval(a
+
+======================================================================
+  DONE — Fill your vulnerability matrix with these results
+======================================================================
+
+  Fill vulnerability_matrix.csv with:
+  VULN     = confirmed vulnerable
+  PARTIAL  = unsanitized entry point (still a vulnerability)
+  SAFE     = validates before dangerous operation
+  N/A      = attack class doesn't apply to this SDK
+
+  SDK          | CWE-77       | CWE-400    | CWE-502    | CWE-94
+  -------------|--------------|------------|------------|----------
+  Qiskit       |              |            |            |
+  Cirq         |              |            |            |
+  PennyLane    |              |            |            |
+  qibo         |              |            |            |

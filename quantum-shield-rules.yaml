@@ -1,0 +1,116 @@
+# QuantumShield -- Semgrep Static Analysis Rules
+# SDK developers: drop this file in your repo and run:
+#   semgrep --config quantum-shield-rules.yaml .
+# CI/CD: add to GitHub Actions, GitLab CI, or pre-commit hooks
+
+rules:
+
+  # --- CWE-77: QASM Injection -----------------------------------------
+  - id: qasm-injection-from-str
+    pattern: QuantumCircuit.from_qasm_str($INPUT)
+    message: |
+      CWE-77: Unsanitized user input reaches QASM parser.
+      from_qasm_str() accepts user-controlled QASM without validation.
+      Fix: use safe_from_qasm_str($INPUT) from QuantumShield.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-77: Improper Neutralization of Special Elements"
+      owasp: "A03:2021 - Injection"
+      fix: "from grammar_validator import safe_from_qasm_str"
+
+  - id: qasm-injection-from-file
+    pattern: QuantumCircuit.from_qasm_file($PATH)
+    message: |
+      CWE-77: Unsanitized file path reaches QASM file parser.
+      from_qasm_file() reads and parses files without content validation.
+      Fix: use safe_from_qasm_file($PATH) from QuantumShield.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-77"
+      fix: "from grammar_validator import safe_from_qasm_file"
+
+  # --- CWE-400: Resource Exhaustion ------------------------------------
+  - id: qubit-resource-exhaustion
+    pattern: np.zeros(2 ** $N)
+    message: |
+      CWE-400: Unvalidated qubit count in np.zeros(2**N).
+      If N comes from user input, N=35 allocates 256GB crashing the server.
+      Fix: validate N < MAX_QUBITS before this call.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-400: Uncontrolled Resource Consumption"
+      threshold: "MAX_QUBITS = 30"
+
+  - id: qubit-count-no-validation
+    pattern: QuantumCircuit($N, ...)
+    message: |
+      CWE-400: QuantumCircuit created without qubit count validation.
+      Large N values cause memory exhaustion during simulation.
+      Fix: validate N < MAX_QUBITS before creating circuits.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-400"
+
+  # --- CWE-502: Unsafe Deserialization ---------------------------------
+  - id: quantum-pickle-load
+    pattern: pickle.load($F)
+    message: |
+      CWE-502: pickle.load() in quantum SDK code.
+      Loading pickled quantum circuits from untrusted sources allows RCE.
+      Fix: use JSON or QASM string serialization for quantum circuits.
+    severity: CRITICAL
+    languages: [python]
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confirmed-in: "qiskit/passmanager/passmanager.py"
+
+  - id: quantum-dill-load
+    pattern-either:
+      - pattern: dill.load($F)
+      - pattern: dill.loads($DATA)
+    message: |
+      CWE-502: dill.load()/dill.loads() in quantum SDK code.
+      dill is a superset of pickle with broader execution capabilities.
+      Loading dill-serialized objects from untrusted sources = RCE.
+      Fix: use JSON or QASM string serialization instead.
+    severity: CRITICAL
+    languages: [python]
+    metadata:
+      cwe: "CWE-502"
+      confirmed-in: "qiskit/passmanager/passmanager.py (dill.loads)"
+
+  # --- CWE-94: Code Injection via eval() -------------------------------
+  - id: qasm-eval-gate-params
+    patterns:
+      - pattern: eval($EXPR)
+      - pattern-inside: |
+          def _get_gate(...):
+            ...
+    message: |
+      CWE-94: eval() called on QASM gate parameter expression.
+      User-controlled QASM content reaches eval() without sanitization.
+      A bare except:pass clause makes this silently exploitable.
+      Fix: use QuantumShield safe_eval_expression($EXPR) instead.
+    severity: CRITICAL
+    languages: [python]
+    metadata:
+      cwe: "CWE-94: Improper Control of Generation of Code"
+      confirmed-in: "qibo/models/_openqasm.py:237"
+      fix: "from safe_eval import safe_eval_expression"
+
+  - id: qasm-eval-pi-substitution
+    pattern: eval($EXPR.replace("pi", ...))
+    message: |
+      CWE-94: eval() called on expression with 'pi' substitution.
+      This pattern appears in QASM parameter processing and is
+      exploitable if $EXPR originates from user input.
+      Fix: use QuantumShield safe_eval_expression($EXPR) instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-94"
+      confirmed-in: "qibo/models/_openqasm.py:237"

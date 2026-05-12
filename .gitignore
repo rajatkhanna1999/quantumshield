@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+paper
+paper/
+
+# Experiment outputs
+agent_outputs/
+agent_results.json
+agent_summary.txt
+
+# QASMbench (large external dataset)
+QASMbench/
