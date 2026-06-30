@@ -4,7 +4,7 @@
 in Human and Agentic Development Workflows**
 
 > Companion artifact repository for the paper submitted to  
-> ACSAC 2026. Anonymous submission — author information  
+> ICTAI 2026. Anonymous submission — author information  
 > withheld for double-blind review.
 
 ---
